@@ -2667,7 +2667,7 @@ function renderHistory() {
     const y = t.sellDate.slice(0,4);
     if (!yoyData[y]) yoyData[y] = { calls:0, puts:0, spreads:0 };
     const s = t.strategy || t.type || '';
-    const val = t.grossCredit || Math.max(0, t.total);
+    const val = realVal(t);
     if (s === 'call') yoyData[y].calls += val;
     else if (s === 'ic' || s === 'spread') yoyData[y].spreads += val;
     else yoyData[y].puts += val;
@@ -2687,8 +2687,11 @@ function renderHistory() {
   });
   renderCumulChart(cumPoints);
 
-  // ── Heatmap ──
-  renderHeatmap(allTrades);
+  // ── Heatmap — uses realized net P&L ──
+  renderHeatmap(allTrades, t => {
+    if (t.status === 'open') return t.grossCredit || t.total;
+    return t.realizedPnl !== null && t.realizedPnl !== undefined ? t.realizedPnl : t.total;
+  });
 
   // ── Ticker rankings ──
   const tickerTotals = {};
@@ -2824,33 +2827,49 @@ function renderCallPutChart(calls, puts, spreads) {
   });
 }
 
-function renderHeatmap(trades) {
+function renderHeatmap(trades, valFn) {
+  // valFn lets the caller control what value each trade contributes
+  // defaults to grossCredit (original sell price) if not provided
+  const getVal = valFn || (t => t.grossCredit || Math.max(0, t.total));
   const monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const dataMap = {};
   trades.forEach(t => {
     const [y,m] = t.sellDate.split('-');
     const key = `${y}-${m}`;
-    const val = t.grossCredit || Math.max(0, t.total);
+    const val = getVal(t);
     dataMap[key] = (dataMap[key]||0) + val;
   });
   const years = [...new Set(trades.map(t=>t.sellDate.slice(0,4)))].sort();
   if (!years.length) { document.getElementById('heatmapWrap').innerHTML = '<div style="color:var(--text3);font-size:12px;padding:20px 0;text-align:center">No data yet</div>'; return; }
 
-  const maxVal = Math.max(...Object.values(dataMap), 1);
+  // For net P&L, some months may be negative — handle that gracefully
+  const vals = Object.values(dataMap);
+  const maxVal = Math.max(...vals, 1);
+  const minVal = Math.min(...vals, 0);
 
   let html = `<div class="heatmap-grid" style="min-width:${60+years.length*40}px">`;
-  // Header row
   html += `<div></div>` + monthLabels.map(m=>`<div class="hm-cell hm-header">${m}</div>`).join('');
-  // Data rows
   years.forEach(y => {
     html += `<div class="hm-cell hm-year">${y}</div>`;
     for (let mo=1; mo<=12; mo++) {
       const key = `${y}-${String(mo).padStart(2,'0')}`;
       const val = dataMap[key] || 0;
-      const intensity = val > 0 ? Math.max(0.12, val/maxVal) : 0;
-      const bg = val > 0 ? `rgba(0,212,170,${intensity.toFixed(2)})` : 'rgba(28,35,48,0.6)';
-      const textColor = intensity > 0.5 ? '#000' : val > 0 ? '#00d4aa' : 'transparent';
-      html += `<div class="hm-cell" style="background:${bg};color:${textColor}" title="${monthLabels[mo-1]} ${y}: $${val.toFixed(2)}">${val>0?'$'+Math.round(val):'·'}</div>`;
+      let bg, textColor;
+      if (val > 0) {
+        const intensity = Math.max(0.12, val / maxVal);
+        bg = `rgba(0,212,170,${intensity.toFixed(2)})`;
+        textColor = intensity > 0.5 ? '#000' : '#00d4aa';
+      } else if (val < 0) {
+        // Negative months (net loss from rolls) shown in red
+        const intensity = Math.max(0.12, Math.abs(val) / (Math.abs(minVal) || 1));
+        bg = `rgba(248,81,73,${intensity.toFixed(2)})`;
+        textColor = intensity > 0.5 ? '#fff' : '#f85149';
+      } else {
+        bg = 'rgba(28,35,48,0.6)';
+        textColor = 'transparent';
+      }
+      const label = val !== 0 ? (val < 0 ? '-$' + Math.round(Math.abs(val)) : '$' + Math.round(val)) : '·';
+      html += `<div class="hm-cell" style="background:${bg};color:${textColor}" title="${monthLabels[mo-1]} ${y}: $${val.toFixed(2)}">${label}</div>`;
     }
   });
   html += `</div>`;
@@ -3160,27 +3179,46 @@ function importPositionsCSV(input) {
   const file = input.files[0]; if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
-    const lines = e.target.result.trim().split('\n').filter(l => l.trim());
-    const header = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
-    const col = h => header.indexOf(h);
+    const text = e.target.result.trim();
+    if (!text) { toast('File is empty', true); return; }
 
-    const str = v => (v || '').trim();
-    const num = v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+    const lines = text.split('\n').filter(l => l.trim());
+    if (lines.length < 2) { toast('No data rows found in CSV', true); return; }
 
-    // Group rows by ticker
+    // Normalize headers: lowercase, strip spaces, strip BOM
+    const header = parseCSVLine(lines[0])
+      .map(h => h.trim().toLowerCase().replace(/\s+/g,'').replace(/^\uFEFF/,''));
+    const col  = h => header.indexOf(h);
+    const safe = (arr, idx) => idx >= 0 && idx < arr.length ? arr[idx] : '';
+    const str  = v => String(v == null ? '' : v).trim();
+    const num  = v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+
     const posMap = {};
     let skipped = 0;
+    const skipReasons = {};
 
     lines.slice(1).forEach(line => {
+      if (!line.trim()) return;
       const c = parseCSVLine(line);
-      const ticker = str(c[col('ticker')]).toUpperCase();
-      const shares = num(c[col('shares')]);
-      const price  = num(c[col('pricepershare')]) || num(c[col('price')]);
-      const date   = str(c[col('purchasedate')]) || str(c[col('date')]);
-      const note   = str(c[col('note')]);
-      const lotId  = str(c[col('lotid')]);
 
-      if (!ticker || !shares || !price || !date) { skipped++; return; }
+      const ticker = str(safe(c, col('ticker'))).toUpperCase();
+      const shares = num(safe(c, col('shares')));
+      // Accept: pricePerShare, price, pricepershare, costbasis, basis
+      const price  = num(safe(c, col('pricepershare')))
+                  || num(safe(c, col('price')))
+                  || num(safe(c, col('costbasis')))
+                  || num(safe(c, col('basis')));
+      // Accept: purchaseDate, date, purchasedate
+      const date   = str(safe(c, col('purchasedate')))
+                  || str(safe(c, col('date')));
+      const note   = str(safe(c, col('note'))) || str(safe(c, col('notes')));
+      const lotId  = str(safe(c, col('lotid'))) || str(safe(c, col('id')));
+
+      if (!ticker) { skipReasons['missing ticker']  = (skipReasons['missing ticker'] ||0)+1; skipped++; return; }
+      if (!shares) { skipReasons['missing shares']  = (skipReasons['missing shares'] ||0)+1; skipped++; return; }
+      if (!price)  { skipReasons['missing price']   = (skipReasons['missing price']  ||0)+1; skipped++; return; }
+      if (!date)   { skipReasons['missing date']    = (skipReasons['missing date']   ||0)+1; skipped++; return; }
+
       if (!posMap[ticker]) posMap[ticker] = [];
       posMap[ticker].push({
         id: lotId || (Date.now() + Math.random()),
@@ -3189,9 +3227,12 @@ function importPositionsCSV(input) {
     });
 
     const tickers = Object.keys(posMap);
-    if (!tickers.length) { toast('No valid positions found in file', true); return; }
+    if (!tickers.length) {
+      const reasons = Object.entries(skipReasons).map(([k,v]) => `${v}× ${k}`).join(', ');
+      toast(`No valid positions found — ${reasons || 'check column headers match: ticker, shares, pricePerShare, purchaseDate'}`, true);
+      return;
+    }
 
-    // Merge: update existing tickers, add new ones
     let added = 0, updated = 0;
     tickers.forEach(ticker => {
       const existing = state.positions.find(p => p.ticker === ticker);
@@ -3208,7 +3249,10 @@ function importPositionsCSV(input) {
     const parts = [];
     if (added)   parts.push(`${added} new`);
     if (updated) parts.push(`${updated} updated`);
-    if (skipped) parts.push(`${skipped} rows skipped`);
+    if (skipped) {
+      const reasons = Object.entries(skipReasons).map(([k,v]) => `${v}× ${k}`).join(', ');
+      parts.push(`${skipped} skipped (${reasons})`);
+    }
     toast(`Positions imported: ${parts.join(', ')}`);
   };
   reader.readAsText(file);
