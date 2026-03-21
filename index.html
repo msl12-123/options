@@ -1450,6 +1450,7 @@ let state = {
   tradeFilter: 'all',
   selectedIds: new Set(),
   visibleTradeIds: [],
+  hasSeenDemo: false,
 };
 
 // Load from localStorage
@@ -1467,18 +1468,28 @@ try {
         };
       });
     }
+    // Anyone who had data saved previously has implicitly seen the demo
+    if (!('hasSeenDemo' in parsed) && (parsed.trades?.length || parsed.positions?.length)) {
+      parsed.hasSeenDemo = true;
+    }
     state = { ...state, ...parsed, selectedIds: new Set(), visibleTradeIds: [] };
   }
 } catch(e) {}
 
 function save() {
-  try { localStorage.setItem('wheeltrack_v2', JSON.stringify({ trades: state.trades, positions: state.positions })); } catch(e) {}
+  try {
+    localStorage.setItem('wheeltrack_v2', JSON.stringify({
+      trades: state.trades,
+      positions: state.positions,
+      hasSeenDemo: true, // once set, demo data never loads again
+    }));
+  } catch(e) {}
 }
 
 // ═══════════════════════════════════════
-//   DEMO DATA (first time)
+//   DEMO DATA (first time only — never again after reset)
 // ═══════════════════════════════════════
-if (state.trades.length === 0) {
+if (!state.hasSeenDemo) {
   const now = new Date();
   const fmt = d => d.toISOString().split('T')[0];
   const ago = n => { const d = new Date(now); d.setDate(d.getDate()-n); return fmt(d); };
@@ -2273,6 +2284,7 @@ function openResetModal() {
       state.positions = [];
       state.prices = {};
       state.selectedIds = new Set();
+      state.hasSeenDemo = true; // never show demo data again
       save();
       render();
       toast('All data cleared — fresh start!');
