@@ -1596,8 +1596,10 @@ function updateCharts() {
     const k = t.sellDate.slice(0,7);
     if (!monthMap[k]) monthMap[k] = { calls:0, puts:0, spreads:0 };
     const s = t.strategy || t.type || '';
-    // Use grossCredit for chart display so rolls don't show as negative bars
-    const val = t.grossCredit || Math.max(0, t.total);
+    // Net realized: use realizedPnl for closed trades, grossCredit for open
+    const val = t.status === 'open'
+      ? (t.grossCredit || t.total)
+      : (t.realizedPnl !== null && t.realizedPnl !== undefined ? t.realizedPnl : t.total);
     if (s === 'call') monthMap[k].calls += val;
     else if (s === 'ic' || s === 'spread') monthMap[k].spreads += val;
     else monthMap[k].puts += val;
