@@ -1149,22 +1149,59 @@
     </div>
 
       <div class="card">
-      <div class="card-header"><div class="card-title">CSV Import / Export Format</div></div>
+      <div class="card-header"><div class="card-title">Data Backup &amp; Transfer</div></div>
       <div class="card-body">
-        <p style="font-size:12px;color:var(--text2);margin-bottom:12px">
-          The export is <strong style="color:var(--accent)">full-fidelity</strong> — it includes close prices, realized P&L, spread strikes, and all other fields so importing it back produces exactly the same numbers. Use it as a backup or to move data between devices.
-        </p>
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:11px;color:var(--text3);overflow-x:auto;white-space:nowrap;line-height:1.8">
-          <span style="color:var(--accent)">Required:</span> ticker, strategy, type, contracts, premium, expiry, sellDate<br>
-          <span style="color:var(--accent4)">Close data:</span> grossCredit, realizedPnl, closePrice, closeDate, closeReason, closeNote<br>
-          <span style="color:var(--call)">Spreads/IC:</span> shortPutStrike, longPutStrike, shortCallStrike, longCallStrike<br>
-          <span style="color:var(--text2)">closeReason values:</span> expired · bought_back · rolled · assigned · called_away
+
+        <!-- Full backup row -->
+        <div style="margin-bottom:20px">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text3);margin-bottom:8px">Full Backup — Trades + Portfolio Positions</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:10px">
+            Exports everything in one JSON file. Import it on any device to restore your exact data — trades, closing costs, realized P&L, spread strikes, stock lots, and avg cost basis. Nothing is lost.
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-primary" style="width:auto;padding:10px 20px" onclick="exportFullBackup()">⬇ Export Full Backup (.json)</button>
+            <button class="btn-outline" onclick="document.getElementById('fullBackupImportInput').click()">⬆ Import Full Backup (.json)</button>
+            <input type="file" id="fullBackupImportInput" accept=".json" style="display:none" onchange="importFullBackup(this)">
+          </div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-          <button class="btn-outline" onclick="downloadTemplate()">⬇ Download Template</button>
-          <button class="btn-outline" onclick="document.getElementById('csvImportInput').click()">⬆ Import CSV File</button>
-          <button class="btn-outline" onclick="exportCSV()">⬇ Export All My Trades</button>
+
+        <div style="border-top:1px solid var(--border);margin:16px 0"></div>
+
+        <!-- Trades CSV row -->
+        <div style="margin-bottom:20px">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text3);margin-bottom:8px">Trades CSV — For Editing in Excel / Sheets</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:10px">
+            Full-fidelity CSV including all close data and spread strikes. Edit in a spreadsheet then re-import. <span style="color:var(--accent4)">Does not include portfolio positions.</span>
+          </div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.8">
+            <span style="color:var(--accent)">Required:</span> ticker, strategy, type, contracts, premium, expiry, sellDate<br>
+            <span style="color:var(--accent4)">Close data:</span> grossCredit, realizedPnl, closePrice, closeDate, closeReason, closeNote<br>
+            <span style="color:var(--call)">Spreads/IC:</span> shortPutStrike, longPutStrike, shortCallStrike, longCallStrike<br>
+            <span style="color:var(--text2)">closeReason values:</span> expired · bought_back · rolled · assigned · called_away
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-outline" onclick="exportCSV()">⬇ Export Trades CSV</button>
+            <button class="btn-outline" onclick="document.getElementById('csvImportInput').click()">⬆ Import Trades CSV</button>
+            <button class="btn-outline" onclick="downloadTemplate()">⬇ Download Template</button>
+            <input type="file" id="csvImportInput" accept=".csv" style="display:none" onchange="importCSV(this)">
+          </div>
         </div>
+
+        <div style="border-top:1px solid var(--border);margin:16px 0"></div>
+
+        <!-- Positions CSV row -->
+        <div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text3);margin-bottom:8px">Portfolio Positions CSV — Stock Lots</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:10px">
+            Exports all stock positions and purchase lots including dates, prices, and notes.
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-outline" onclick="exportPositionsCSV()">⬇ Export Positions CSV</button>
+            <button class="btn-outline" onclick="document.getElementById('posImportInput').click()">⬆ Import Positions CSV</button>
+            <input type="file" id="posImportInput" accept=".csv" style="display:none" onchange="importPositionsCSV(this)">
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -1174,7 +1211,14 @@
   <div id="tab-portfolio" style="display:none">
 
     <!-- Holdings cards -->
-    <div class="section-title">Holdings &amp; Cost Basis</div>
+    <div class="section-title">Holdings &amp; Cost Basis
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="btn-outline" style="font-size:11px;padding:4px 12px" onclick="exportPositionsCSV()">⬇ Export Positions</button>
+        <button class="btn-outline" style="font-size:11px;padding:4px 12px" onclick="document.getElementById('posImportInput2').click()">⬆ Import Positions</button>
+        <input type="file" id="posImportInput2" accept=".csv" style="display:none" onchange="importPositionsCSV(this)">
+        <button class="btn-outline" style="font-size:11px;padding:4px 12px" onclick="exportFullBackup()">⬇ Full Backup</button>
+      </div>
+    </div>
     <div id="portfolioGrid" class="portfolio-grid">
       <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)">
         <div style="font-size:32px;margin-bottom:10px">📊</div>
@@ -2833,6 +2877,21 @@ function renderDrillTable(trades) {
 function setHistYear(y) { historyState.year = y; renderHistory(); }
 function setHistTicker(t) { historyState.ticker = t; renderHistory(); }
 
+// ── Shared CSV line parser (handles quoted fields with commas) ──
+function parseCSVLine(line) {
+  const result = []; let cur = '', inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuote && line[i+1] === '"') { cur += '"'; i++; }
+      else inQuote = !inQuote;
+    } else if (ch === ',' && !inQuote) { result.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  result.push(cur);
+  return result;
+}
+
 // ── CSV Export ──
 function exportCSV() {
   const trades = getHistoryTrades();
@@ -2877,25 +2936,6 @@ function importCSV(input) {
   const reader = new FileReader();
   reader.onload = e => {
     const text = e.target.result.trim();
-
-    // Parse CSV respecting quoted fields
-    function parseCSVLine(line) {
-      const result = [];
-      let cur = '', inQuote = false;
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (ch === '"') {
-          if (inQuote && line[i+1] === '"') { cur += '"'; i++; }
-          else inQuote = !inQuote;
-        } else if (ch === ',' && !inQuote) {
-          result.push(cur); cur = '';
-        } else {
-          cur += ch;
-        }
-      }
-      result.push(cur);
-      return result;
-    }
 
     const lines = text.split('\n').filter(l => l.trim());
     const header = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
@@ -3002,6 +3042,165 @@ function downloadTemplate() {
   a.download = 'wheeltrack_template.csv';
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════
+//   FULL BACKUP (JSON — trades + positions)
+// ═══════════════════════════════════════
+function exportFullBackup() {
+  const backup = {
+    version: 3,
+    exportedAt: new Date().toISOString(),
+    trades: state.trades,
+    positions: state.positions,
+  };
+  const json = JSON.stringify(backup, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `wheeltrack_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast(`Full backup exported — ${state.trades.length} trades, ${state.positions.length} positions`);
+}
+
+function importFullBackup(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const backup = JSON.parse(e.target.result);
+
+      // Validate structure
+      if (!backup.trades || !Array.isArray(backup.trades)) {
+        toast('Invalid backup file — missing trades array', true); return;
+      }
+
+      const hadTrades    = state.trades.length;
+      const hadPositions = state.positions.length;
+
+      // Merge strategy: backup wins, but ask via confirm modal
+      openConfirmModal({
+        icon: '📥',
+        title: 'Import Full Backup?',
+        body: `This will replace all your current data (${hadTrades} trades, ${hadPositions} positions) with the backup (${backup.trades.length} trades, ${(backup.positions||[]).length} positions). This cannot be undone — export a backup first if needed.`,
+        okLabel: 'Replace & Import',
+        onOk: () => {
+          state.trades    = backup.trades    || [];
+          state.positions = backup.positions || [];
+          state.selectedIds   = new Set();
+          state.visibleTradeIds = [];
+          save();
+          render();
+          fetchPrices();
+          toast(`✅ Restored ${state.trades.length} trades and ${state.positions.length} positions`);
+        }
+      });
+    } catch (err) {
+      toast('Could not read backup file — is it a valid .json?', true);
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+// ═══════════════════════════════════════
+//   POSITIONS CSV EXPORT / IMPORT
+// ═══════════════════════════════════════
+function exportPositionsCSV() {
+  if (!state.positions.length) { toast('No positions to export', true); return; }
+
+  const esc = v => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const header = 'ticker,lotId,shares,pricePerShare,purchaseDate,note';
+  const rows = [];
+  state.positions.forEach(pos => {
+    (pos.lots || []).forEach(lot => {
+      rows.push([
+        esc(pos.ticker),
+        esc(lot.id),
+        esc(lot.shares),
+        esc(lot.price),
+        esc(lot.date),
+        esc(lot.note),
+      ].join(','));
+    });
+  });
+
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `wheeltrack_positions_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast(`Exported ${state.positions.length} positions (${rows.length} lots)`);
+}
+
+function importPositionsCSV(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const lines = e.target.result.trim().split('\n').filter(l => l.trim());
+    const header = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
+    const col = h => header.indexOf(h);
+
+    const str = v => (v || '').trim();
+    const num = v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+
+    // Group rows by ticker
+    const posMap = {};
+    let skipped = 0;
+
+    lines.slice(1).forEach(line => {
+      const c = parseCSVLine(line);
+      const ticker = str(c[col('ticker')]).toUpperCase();
+      const shares = num(c[col('shares')]);
+      const price  = num(c[col('pricepershare')]) || num(c[col('price')]);
+      const date   = str(c[col('purchasedate')]) || str(c[col('date')]);
+      const note   = str(c[col('note')]);
+      const lotId  = str(c[col('lotid')]);
+
+      if (!ticker || !shares || !price || !date) { skipped++; return; }
+      if (!posMap[ticker]) posMap[ticker] = [];
+      posMap[ticker].push({
+        id: lotId || (Date.now() + Math.random()),
+        shares, price, date, note,
+      });
+    });
+
+    const tickers = Object.keys(posMap);
+    if (!tickers.length) { toast('No valid positions found in file', true); return; }
+
+    // Merge: update existing tickers, add new ones
+    let added = 0, updated = 0;
+    tickers.forEach(ticker => {
+      const existing = state.positions.find(p => p.ticker === ticker);
+      if (existing) {
+        existing.lots = posMap[ticker];
+        updated++;
+      } else {
+        state.positions.push({ ticker, lots: posMap[ticker] });
+        added++;
+      }
+    });
+
+    save(); render(); fetchPrices();
+    const parts = [];
+    if (added)   parts.push(`${added} new`);
+    if (updated) parts.push(`${updated} updated`);
+    if (skipped) parts.push(`${skipped} rows skipped`);
+    toast(`Positions imported: ${parts.join(', ')}`);
+  };
+  reader.readAsText(file);
+  input.value = '';
 }
 
 // ═══════════════════════════════════════
