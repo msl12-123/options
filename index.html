@@ -2753,6 +2753,7 @@ function updatePortfolio() {
         </div>
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn-outline" style="font-size:11px;padding:4px 12px" onclick="document.getElementById('portTicker').value='${pos.ticker}';document.getElementById('portShares').focus();document.querySelector('[onclick=\\'showTab(\\'portfolio\\')\\'],[onclick=\\'showTab(\\\"portfolio\\\")\\'\\']')">+ Add Lot</button>
+          <button class="btn-outline" style="font-size:11px;padding:4px 12px;border-color:rgba(63,185,80,0.4);color:var(--green)" onclick="openSellSharesModal('${pos.ticker}')">Sell Shares</button>
           <button class="btn-sm" onclick="removePosition('${pos.ticker}')">Remove All</button>
         </div>
       </div>
