@@ -102,7 +102,7 @@
   /* ── STAT CARDS ── */
   .stat-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 16px;
     margin-bottom: 28px;
   }
@@ -585,7 +585,7 @@
 
   /* ── RESPONSIVE ── */
   @media (max-width: 1100px) {
-    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    .stat-grid { grid-template-columns: repeat(3, 1fr); }
     .main-grid { grid-template-columns: 1fr; }
     .portfolio-grid { grid-template-columns: repeat(2, 1fr); }
   }
@@ -911,14 +911,19 @@
     <!-- STAT CARDS -->
     <div class="stat-grid">
       <div class="stat-card">
-        <div class="stat-label">Total Premium Collected</div>
+        <div class="stat-label">Gross Premium Collected</div>
         <div class="stat-value green" id="statTotal">$0.00</div>
-        <div class="stat-sub" id="statTotalSub">All time</div>
+        <div class="stat-sub" id="statTotalSub">All option credits received</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">This Month</div>
+        <div class="stat-label">Realized Options P&amp;L</div>
+        <div class="stat-value green" id="statRealized">$0.00</div>
+        <div class="stat-sub" id="statRealizedSub">Closed positions only</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Realized This Month</div>
         <div class="stat-value accent" id="statMonth">$0.00</div>
-        <div class="stat-sub" id="statMonthSub">0 contracts</div>
+        <div class="stat-sub" id="statMonthSub">0 closed trades</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Open Positions</div>
@@ -936,7 +941,7 @@
     <div class="main-grid">
       <div class="card">
         <div class="card-header">
-          <div class="card-title">Premium Over Time</div>
+          <div class="card-title">Realized Options P&amp;L Over Time</div>
           <div style="display:flex;gap:6px">
             <button class="btn-sm" onclick="setChartMode('monthly')" id="btnMonthly">Monthly</button>
             <button class="btn-sm" onclick="setChartMode('cumulative')" id="btnCumulative">Cumulative</button>
@@ -968,7 +973,7 @@
     <div class="main-grid">
       <div class="card">
         <div class="card-header">
-          <div class="card-title">Monthly Breakdown</div>
+          <div class="card-title">Monthly Realized P&amp;L</div>
         </div>
         <div class="card-body">
           <div class="month-chips" id="monthChips"></div>
@@ -981,7 +986,7 @@
 
       <div class="card">
         <div class="card-header">
-          <div class="card-title">By Ticker</div>
+          <div class="card-title">Realized P&amp;L By Ticker</div>
         </div>
         <div class="card-body">
           <div class="chart-wrap" style="height:240px">
@@ -1156,7 +1161,7 @@
         <div style="margin-bottom:20px">
           <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text3);margin-bottom:8px">Full Backup — Trades + Portfolio Positions</div>
           <div style="font-size:12px;color:var(--text2);margin-bottom:10px">
-            Exports everything in one JSON file. Import it on any device to restore your exact data — trades, closing costs, realized P&L, spread strikes, stock lots, and avg cost basis. Nothing is lost.
+            Exports everything in one JSON file. Import it on any device to restore your exact data — trades, closing costs, realized option P&L, stock lots, recorded share sales, realized stock P&L, and avg cost basis. Nothing is lost.
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn-primary" style="width:auto;padding:10px 20px" onclick="exportFullBackup()">⬇ Export Full Backup (.json)</button>
@@ -1264,6 +1269,9 @@
 
     <!-- Lot detail tables per ticker -->
     <div id="lotDetailSection" style="margin-top:24px"></div>
+
+    <!-- Realized share sales -->
+    <div id="stockSalesSection" style="margin-top:24px"></div>
 
   </div><!-- /portfolio -->
 
@@ -1422,6 +1430,53 @@
   </div>
 </div>
 
+
+<!-- SELL SHARES MODAL -->
+<div class="modal-bg" id="sellSharesModalBg" onclick="closeSellSharesModalBg(event)">
+  <div class="modal" style="width:520px">
+    <div class="modal-title">
+      Sell Shares
+      <button class="close-modal" onclick="closeSellSharesModal()">✕</button>
+    </div>
+    <div id="sellSharesInfo" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px"></div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Shares to Sell</label>
+        <input type="number" id="sellSharesQty" min="1" step="1" placeholder="100" oninput="updateShareSalePreview()">
+      </div>
+      <div class="form-group">
+        <label>Sale Price / Share</label>
+        <input type="number" id="sellSharesPrice" min="0.01" step="0.01" placeholder="150.00" oninput="updateShareSalePreview()">
+      </div>
+      <div class="form-group">
+        <label>Sale Date</label>
+        <input type="date" id="sellSharesDate" oninput="updateShareSalePreview()">
+      </div>
+      <div class="form-group">
+        <label>Cost Basis Method</label>
+        <select id="sellSharesMethod" onchange="updateShareSalePreview()">
+          <option value="fifo">FIFO — oldest shares first</option>
+          <option value="lifo">LIFO — newest shares first</option>
+          <option value="highest">Highest cost first</option>
+          <option value="lowest">Lowest cost first</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label>Note (optional)</label>
+        <input type="text" id="sellSharesNote" placeholder="e.g. Partial trim, called away, rebalancing">
+      </div>
+      <div class="form-group full">
+        <div id="shareSalePreview" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:13px;color:var(--text2)">
+          Enter shares and sale price to preview realized P&amp;L.
+        </div>
+      </div>
+      <div class="form-group full">
+        <button class="btn-primary" onclick="submitShareSale()">Record Share Sale</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- RESET / CONFIRM MODAL -->
 <div class="confirm-modal-bg" id="confirmModalBg" onclick="closeConfirmModalBg(event)">
   <div class="confirm-modal">
@@ -1445,6 +1500,7 @@
 let state = {
   trades: [],
   positions: [],
+  stockSales: [],
   prices: {},
   chartMode: 'monthly',
   tradeFilter: 'all',
@@ -1472,6 +1528,7 @@ try {
     if (!('hasSeenDemo' in parsed) && (parsed.trades?.length || parsed.positions?.length)) {
       parsed.hasSeenDemo = true;
     }
+    if (!Array.isArray(parsed.stockSales)) parsed.stockSales = [];
     state = { ...state, ...parsed, selectedIds: new Set(), visibleTradeIds: [] };
   }
 } catch(e) {}
@@ -1481,6 +1538,7 @@ function save() {
     localStorage.setItem('wheeltrack_v2', JSON.stringify({
       trades: state.trades,
       positions: state.positions,
+      stockSales: state.stockSales,
       hasSeenDemo: true, // once set, demo data never loads again
     }));
   } catch(e) {}
@@ -1590,27 +1648,43 @@ function initCharts() {
   });
 }
 
+function tradeRealizedDate(t) {
+  return t.closeDate || (t.status !== 'open' ? t.expiry : null) || t.sellDate;
+}
+
+function realizedTradeValue(t) {
+  if (t.status === 'open') return null;
+  if (t.realizedPnl !== null && t.realizedPnl !== undefined) return Number(t.realizedPnl) || 0;
+  return Number(t.total) || 0;
+}
+
 function updateCharts() {
+  // Main dashboard charts intentionally show CLOSED / REALIZED option P&L only.
+  // Open credits stay visible in the stat cards, but are not counted as profit here.
   const monthMap = {};
   state.trades.forEach(t => {
-    const k = t.sellDate.slice(0,7);
+    const val = realizedTradeValue(t);
+    const date = tradeRealizedDate(t);
+    if (val === null || !date) return;
+    const k = date.slice(0,7);
     if (!monthMap[k]) monthMap[k] = { calls:0, puts:0, spreads:0 };
     const s = t.strategy || t.type || '';
-    // Net realized: use realizedPnl for closed trades, grossCredit for open
-    const val = t.status === 'open'
-      ? (t.grossCredit || t.total)
-      : (t.realizedPnl !== null && t.realizedPnl !== undefined ? t.realizedPnl : t.total);
     if (s === 'call') monthMap[k].calls += val;
     else if (s === 'ic' || s === 'spread') monthMap[k].spreads += val;
     else monthMap[k].puts += val;
   });
 
   const months = Object.keys(monthMap).sort();
-  const labels = months.map(m => { const [y,mo] = m.split('-'); return new Date(+y,+mo-1,1).toLocaleString('default',{month:'short', year:'2-digit'}); });
+  const labels = months.map(m => {
+    const [y,mo] = m.split('-');
+    return new Date(+y,+mo-1,1).toLocaleString('default',{month:'short', year:'2-digit'});
+  });
 
-  // Cumulative
   let cum = 0;
-  const cumData = months.map(m => { cum += monthMap[m].calls + monthMap[m].puts + monthMap[m].spreads; return cum; });
+  const cumData = months.map(m => {
+    cum += monthMap[m].calls + monthMap[m].puts + monthMap[m].spreads;
+    return cum;
+  });
 
   if (state.chartMode === 'monthly') {
     premiumChart.data.labels = labels;
@@ -1625,26 +1699,26 @@ function updateCharts() {
     premiumChart.data.datasets[0].data = cumData;
     premiumChart.data.datasets[1].data = [];
     premiumChart.data.datasets[2].data = [];
-    premiumChart.data.datasets[0].label = 'Cumulative';
+    premiumChart.data.datasets[0].label = 'Cumulative Realized P&L';
     premiumChart.data.datasets[1].label = '';
     premiumChart.data.datasets[2].label = '';
   }
   premiumChart.update();
 
-  // Monthly line
   monthlyBreakChart.data.labels = labels;
+  monthlyBreakChart.data.datasets[0].label = 'Monthly Realized P&L';
   monthlyBreakChart.data.datasets[0].data = months.map(m => monthMap[m].calls + monthMap[m].puts + monthMap[m].spreads);
   monthlyBreakChart.update();
 
-  // Ticker pie — use grossCredit for visual representation
   const tickerMap = {};
   state.trades.forEach(t => {
-    const val = t.grossCredit || Math.max(0, t.total);
-    tickerMap[t.ticker] = (tickerMap[t.ticker]||0) + val;
+    const val = realizedTradeValue(t);
+    if (val === null) return;
+    tickerMap[t.ticker] = (tickerMap[t.ticker] || 0) + val;
   });
-  const tickers = Object.keys(tickerMap).filter(k => tickerMap[k] > 0);
+  const tickers = Object.keys(tickerMap).filter(k => tickerMap[k] !== 0);
   tickerPieChart.data.labels = tickers;
-  tickerPieChart.data.datasets[0].data = tickers.map(t => tickerMap[t]);
+  tickerPieChart.data.datasets[0].data = tickers.map(t => Math.abs(tickerMap[t]));
   tickerPieChart.data.datasets[0].backgroundColor = COLORS.slice(0, tickers.length);
   tickerPieChart.update();
 }
@@ -1725,45 +1799,63 @@ function render() {
 }
 
 function updateStats() {
-  // Gross = what was originally sold (grossCredit or total for older trades)
-  const grossTotal = state.trades.reduce((s, t) => s + (t.grossCredit || Math.abs(t.total)), 0);
-  // Net = realized P&L (total after buybacks/rolls) for closed, grossCredit for open
-  const netTotal = state.trades.reduce((s, t) => {
-    if (t.status === 'open') return s + (t.grossCredit || t.total);
-    return s + (t.realizedPnl !== null && t.realizedPnl !== undefined ? t.realizedPnl : t.total);
+  const grossTotal = state.trades.reduce((s, t) => s + (Number(t.grossCredit) || Math.max(0, Number(t.total) || 0)), 0);
+  const realizedTotal = state.trades.reduce((s, t) => {
+    const v = realizedTradeValue(t);
+    return s + (v === null ? 0 : v);
   }, 0);
+  const openPremium = state.trades
+    .filter(t => t.status === 'open')
+    .reduce((s,t) => s + (Number(t.grossCredit) || Number(t.total) || 0), 0);
 
   const now = new Date();
   const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const thisMonthTrades = state.trades.filter(t => t.sellDate.startsWith(ym));
-  const thisMonth = thisMonthTrades.reduce((s,t) => s + (t.realizedPnl !== null && t.realizedPnl !== undefined ? t.realizedPnl : (t.grossCredit || t.total)), 0);
+  const thisMonthTrades = state.trades.filter(t => {
+    if (t.status === 'open') return false;
+    const d = tradeRealizedDate(t);
+    return d && d.startsWith(ym);
+  });
+  const thisMonth = thisMonthTrades.reduce((s,t) => s + (realizedTradeValue(t) || 0), 0);
   const monthCount = thisMonthTrades.length;
-  const open = state.trades.filter(t => t.status==='open');
-  const avgDTE = open.length ? Math.round(open.reduce((s,t) => s + Math.max(0, Math.ceil((new Date(t.expiry)-now)/86400000)), 0) / open.length) : 0;
 
-  // Cost basis reduction uses net realized
+  const open = state.trades.filter(t => t.status==='open');
+  const avgDTE = open.length
+    ? Math.round(open.reduce((s,t) => s + Math.max(0, Math.ceil((new Date(t.expiry)-now)/86400000)), 0) / open.length)
+    : 0;
+
+  // Cost-basis display keeps using option cash flow associated with currently held tickers.
   let totalBasisReduction = 0, totalOrigBasis = 0;
   state.positions.forEach(pos => {
     const avgCost = calcAvgCost(pos.lots || []);
     const totShares = calcTotalShares(pos.lots || []);
     const orig = avgCost * totShares;
     const collected = state.trades.filter(t => t.ticker === pos.ticker).reduce((s,t) => {
-      if (t.status === 'open') return s + (t.grossCredit || t.total);
-      return s + (t.realizedPnl !== null && t.realizedPnl !== undefined ? t.realizedPnl : t.total);
+      if (t.status === 'open') return s + (Number(t.grossCredit) || Number(t.total) || 0);
+      const v = realizedTradeValue(t);
+      return s + (v === null ? 0 : v);
     }, 0);
     totalBasisReduction += collected;
     totalOrigBasis += orig;
   });
   const basisPct = totalOrigBasis > 0 ? (totalBasisReduction / totalOrigBasis * 100) : 0;
 
-  document.getElementById('statTotal').textContent = '$' + netTotal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-  document.getElementById('statTotalSub').innerHTML = `Gross collected: <span style="color:var(--text2)">$${grossTotal.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`;
-  document.getElementById('statMonth').textContent = '$' + thisMonth.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-  document.getElementById('statMonthSub').innerHTML = `<span>${monthCount} trade${monthCount!==1?'s':''} this month</span>`;
+  document.getElementById('statTotal').textContent = '$' + grossTotal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  document.getElementById('statTotalSub').textContent = 'All option credits received';
+
+  const realizedEl = document.getElementById('statRealized');
+  realizedEl.textContent = (realizedTotal < 0 ? '-$' : '$') + Math.abs(realizedTotal).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  realizedEl.style.color = realizedTotal >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('statRealizedSub').innerHTML = `Open credits not yet realized: <span style="color:var(--accent4)">$${openPremium.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`;
+
+  const monthEl = document.getElementById('statMonth');
+  monthEl.textContent = (thisMonth < 0 ? '-$' : '$') + Math.abs(thisMonth).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  monthEl.style.color = thisMonth >= 0 ? 'var(--accent)' : 'var(--red)';
+  document.getElementById('statMonthSub').innerHTML = `<span>${monthCount} closed trade${monthCount!==1?'s':''} this month</span>`;
+
   document.getElementById('statOpen').textContent = open.length;
   document.getElementById('statOpenSub').textContent = `Avg DTE: ${avgDTE || '—'}`;
   document.getElementById('statBasis').textContent = basisPct.toFixed(2) + '%';
-  document.getElementById('statBasisSub').textContent = `$${totalBasisReduction.toFixed(2)} net realized`;
+  document.getElementById('statBasisSub').textContent = `$${totalBasisReduction.toFixed(2)} incl. open credits`;
   document.getElementById('openCount').textContent = `${open.length} active`;
 }
 
@@ -1882,20 +1974,21 @@ function updateTradesTable() {
 // updatePortfolio is defined later with full lot-aware implementation
 
 function updateMonthChips() {
-  const months = [...new Set(state.trades.map(t => t.sellDate.slice(0,7)))].sort().reverse();
+  const closed = state.trades.filter(t => t.status !== 'open' && tradeRealizedDate(t));
+  const months = [...new Set(closed.map(t => tradeRealizedDate(t).slice(0,7)))].sort().reverse();
   const el = document.getElementById('monthChips');
-  if (!months.length) { el.innerHTML = '<span style="color:var(--text3);font-size:12px">No data yet</span>'; return; }
+  if (!months.length) {
+    el.innerHTML = '<span style="color:var(--text3);font-size:12px">No realized trades yet</span>';
+    return;
+  }
   el.innerHTML = months.map(m => {
-    const total = state.trades.filter(t => t.sellDate.startsWith(m)).reduce((s,t) => {
-      const val = t.status === 'open'
-        ? (t.grossCredit || t.total)
-        : (t.realizedPnl !== null && t.realizedPnl !== undefined ? t.realizedPnl : t.total);
-      return s + val;
-    }, 0);
+    const trades = closed.filter(t => tradeRealizedDate(t).startsWith(m));
+    const total = trades.reduce((s,t) => s + (realizedTradeValue(t) || 0), 0);
     const [y,mo] = m.split('-');
     const label = new Date(+y,+mo-1,1).toLocaleString('default',{month:'short',year:'2-digit'});
     const color = total >= 0 ? 'var(--accent)' : 'var(--red)';
-    return `<div class="month-chip">${label} <span style="color:${color}">$${total.toFixed(0)}</span></div>`;
+    const sign = total < 0 ? '-' : '';
+    return `<div class="month-chip">${label} <span style="color:${color}">${sign}$${Math.abs(total).toFixed(0)}</span></div>`;
   }).join('');
 }
 
@@ -2284,6 +2377,7 @@ function openResetModal() {
     onOk: () => {
       state.trades = [];
       state.positions = [];
+      state.stockSales = [];
       state.prices = {};
       state.selectedIds = new Set();
       state.hasSeenDemo = true; // never show demo data again
@@ -2301,6 +2395,186 @@ function calcAvgCost(lots) {
   return totalShares > 0 ? totalCost / totalShares : 0;
 }
 function calcTotalShares(lots) { return lots.reduce((s,l) => s+l.shares, 0); }
+
+function tickerRealizedStockPnl(ticker) {
+  return (state.stockSales || [])
+    .filter(s => s.ticker === ticker)
+    .reduce((sum,s) => sum + (Number(s.realizedPnl) || 0), 0);
+}
+
+function orderedLotsForSale(lots, method='fifo') {
+  const arr = [...lots];
+  if (method === 'lifo') return arr.sort((a,b) => (b.date || '').localeCompare(a.date || ''));
+  if (method === 'highest') return arr.sort((a,b) => b.price - a.price);
+  if (method === 'lowest') return arr.sort((a,b) => a.price - b.price);
+  return arr.sort((a,b) => (a.date || '').localeCompare(b.date || '')); // FIFO
+}
+
+function calcShareSale(ticker, shares, salePrice, method='fifo') {
+  const pos = state.positions.find(p => p.ticker === ticker);
+  if (!pos || shares <= 0 || salePrice <= 0) return null;
+  const available = calcTotalShares(pos.lots || []);
+  if (shares > available) return { error:`Only ${available} shares available` };
+
+  let remaining = shares;
+  let costBasis = 0;
+  const breakdown = [];
+  for (const lot of orderedLotsForSale(pos.lots || [], method)) {
+    if (remaining <= 0) break;
+    const used = Math.min(remaining, lot.shares);
+    costBasis += used * lot.price;
+    breakdown.push({ lotId:lot.id, shares:used, price:lot.price, date:lot.date });
+    remaining -= used;
+  }
+  const proceeds = shares * salePrice;
+  const realizedPnl = proceeds - costBasis;
+  return {
+    shares, salePrice, proceeds, costBasis, realizedPnl,
+    avgSoldBasis: shares ? costBasis / shares : 0,
+    breakdown
+  };
+}
+
+let activeSellTicker = null;
+
+function openSellSharesModal(ticker) {
+  const pos = state.positions.find(p => p.ticker === ticker);
+  if (!pos) return;
+  activeSellTicker = ticker;
+  const total = calcTotalShares(pos.lots || []);
+  const avg = calcAvgCost(pos.lots || []);
+  document.getElementById('sellSharesInfo').innerHTML =
+    `<strong style="color:var(--accent)">${ticker}</strong> · ${total} shares available · current avg cost $${avg.toFixed(2)}<br>` +
+    `<span style="color:var(--text3);font-size:11px">Choose how lots are consumed for realized P&amp;L. The remaining share lots will be updated automatically.</span>`;
+  document.getElementById('sellSharesQty').value = '';
+  document.getElementById('sellSharesPrice').value = state.prices[ticker]?.price ? state.prices[ticker].price.toFixed(2) : '';
+  document.getElementById('sellSharesDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('sellSharesMethod').value = 'fifo';
+  document.getElementById('sellSharesNote').value = '';
+  updateShareSalePreview();
+  document.getElementById('sellSharesModalBg').classList.add('open');
+}
+
+function closeSellSharesModal() {
+  document.getElementById('sellSharesModalBg').classList.remove('open');
+  activeSellTicker = null;
+}
+function closeSellSharesModalBg(e) {
+  if (e.target === document.getElementById('sellSharesModalBg')) closeSellSharesModal();
+}
+
+function updateShareSalePreview() {
+  const box = document.getElementById('shareSalePreview');
+  if (!activeSellTicker || !box) return;
+  const shares = parseFloat(document.getElementById('sellSharesQty').value);
+  const price = parseFloat(document.getElementById('sellSharesPrice').value);
+  const method = document.getElementById('sellSharesMethod').value;
+  if (!shares || !price) {
+    box.innerHTML = 'Enter shares and sale price to preview realized P&amp;L.';
+    return;
+  }
+  const calc = calcShareSale(activeSellTicker, shares, price, method);
+  if (!calc || calc.error) {
+    box.innerHTML = `<span style="color:var(--red)">${calc?.error || 'Invalid sale'}</span>`;
+    return;
+  }
+  const c = calc.realizedPnl >= 0 ? 'var(--green)' : 'var(--red)';
+  box.innerHTML = `
+    <div style="display:flex;gap:22px;flex-wrap:wrap">
+      <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase">Proceeds</div><div style="font-weight:600">$${calc.proceeds.toFixed(2)}</div></div>
+      <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase">Cost Basis Sold</div><div style="font-weight:600">$${calc.costBasis.toFixed(2)}</div><div style="font-size:10px;color:var(--text3)">$${calc.avgSoldBasis.toFixed(2)}/share</div></div>
+      <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase">Realized P&amp;L</div><div style="font-weight:700;color:${c}">${calc.realizedPnl>=0?'+':'-'}$${Math.abs(calc.realizedPnl).toFixed(2)}</div></div>
+    </div>`;
+}
+
+function submitShareSale() {
+  if (!activeSellTicker) return;
+  const ticker = activeSellTicker;
+  const shares = parseFloat(document.getElementById('sellSharesQty').value);
+  const salePrice = parseFloat(document.getElementById('sellSharesPrice').value);
+  const saleDate = document.getElementById('sellSharesDate').value;
+  const method = document.getElementById('sellSharesMethod').value;
+  const note = document.getElementById('sellSharesNote').value.trim();
+
+  if (!shares || !Number.isInteger(shares) || shares <= 0 || !salePrice || salePrice <= 0 || !saleDate) {
+    toast('Enter a whole-number share quantity, sale price, and sale date', true);
+    return;
+  }
+
+  const calc = calcShareSale(ticker, shares, salePrice, method);
+  if (!calc || calc.error) { toast(calc?.error || 'Could not calculate sale', true); return; }
+
+  const pos = state.positions.find(p => p.ticker === ticker);
+  if (!pos) return;
+
+  // Consume the selected lots based on the preview breakdown.
+  calc.breakdown.forEach(part => {
+    const lot = pos.lots.find(l => String(l.id) === String(part.lotId));
+    if (!lot) return;
+    lot.shares -= part.shares;
+  });
+  pos.lots = pos.lots.filter(l => l.shares > 0.000001);
+  if (!pos.lots.length) state.positions = state.positions.filter(p => p.ticker !== ticker);
+
+  if (!state.stockSales) state.stockSales = [];
+  state.stockSales.push({
+    id: Date.now() + Math.random(),
+    ticker, shares, salePrice, saleDate, method, note,
+    proceeds: parseFloat(calc.proceeds.toFixed(2)),
+    costBasis: parseFloat(calc.costBasis.toFixed(2)),
+    realizedPnl: parseFloat(calc.realizedPnl.toFixed(2)),
+    avgSoldBasis: parseFloat(calc.avgSoldBasis.toFixed(4)),
+    lotsUsed: calc.breakdown
+  });
+
+  closeSellSharesModal();
+  save();
+  render();
+  fetchPrices();
+  toast(`Sold ${shares} ${ticker} @ $${salePrice.toFixed(2)} · Realized ${calc.realizedPnl>=0?'+':'-'}$${Math.abs(calc.realizedPnl).toFixed(2)}`);
+}
+
+function updateStockSalesSection() {
+  const el = document.getElementById('stockSalesSection');
+  if (!el) return;
+  const sales = [...(state.stockSales || [])].sort((a,b) => (b.saleDate || '').localeCompare(a.saleDate || ''));
+  if (!sales.length) {
+    el.innerHTML = `
+      <div class="section-title">Realized Share Sales</div>
+      <div class="card"><div class="empty-state"><div class="empty-icon">💵</div><div class="empty-text">No recorded share sales yet</div><div class="empty-sub">Use “Sell Shares” on a portfolio holding to track realized stock P&amp;L.</div></div></div>`;
+    return;
+  }
+
+  const totalPnl = sales.reduce((s,x) => s + (Number(x.realizedPnl)||0), 0);
+  const rows = sales.map(s => `
+    <tr>
+      <td>${new Date(s.saleDate+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td>
+      <td style="font-weight:700;color:var(--accent)">${s.ticker}</td>
+      <td>${s.shares}</td>
+      <td>$${Number(s.salePrice).toFixed(2)}</td>
+      <td>$${Number(s.avgSoldBasis || (s.costBasis/s.shares)).toFixed(2)}</td>
+      <td>$${Number(s.proceeds).toFixed(2)}</td>
+      <td style="color:${s.realizedPnl>=0?'var(--green)':'var(--red)'};font-weight:600">${s.realizedPnl>=0?'+':'-'}$${Math.abs(Number(s.realizedPnl)).toFixed(2)}</td>
+      <td style="color:var(--text3);font-size:11px">${(s.method||'fifo').toUpperCase()}</td>
+      <td style="color:var(--text3);font-size:11px;max-width:180px;white-space:normal">${s.note||'—'}</td>
+    </tr>`).join('');
+
+  el.innerHTML = `
+    <div class="section-title">Realized Share Sales</div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Stock Sale History</div>
+        <span style="font-size:12px;color:${totalPnl>=0?'var(--green)':'var(--red)'}">Total realized: ${totalPnl>=0?'+':'-'}$${Math.abs(totalPnl).toFixed(2)}</span>
+      </div>
+      <div class="table-wrap">
+        <table class="lot-table">
+          <thead><tr><th>Date</th><th>Ticker</th><th>Shares</th><th>Sale Price</th><th>Basis / Sh</th><th>Proceeds</th><th>Realized P&amp;L</th><th>Method</th><th>Note</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
 
 function addLot() {
   const ticker = document.getElementById('portTicker').value.trim().toUpperCase();
@@ -2391,6 +2665,7 @@ function updatePortfolio() {
   if (!state.positions.length) {
     grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)"><div style="font-size:32px;margin-bottom:10px">📊</div>Add stock positions to track your wheel strategy</div>';
     detail.innerHTML = '';
+    updateStockSalesSection();
     return;
   }
 
@@ -2407,6 +2682,7 @@ function updatePortfolio() {
     const avgCost  = calcAvgCost(pos.lots);
     const totShares= calcTotalShares(pos.lots);
     const collected= tickerPremium[pos.ticker] || 0;
+    const stockRealized = tickerRealizedStockPnl(pos.ticker);
     const adjBasis = avgCost - collected / totShares;
     const reduction= avgCost > 0 ? (collected / (avgCost * totShares) * 100) : 0;
     const pr = state.prices[pos.ticker];
@@ -2427,6 +2703,7 @@ function updatePortfolio() {
         <div class="port-basis" style="margin-top:2px">Avg cost: $${avgCost.toFixed(2)}</div>
         <div class="port-basis">Adj basis: <span style="color:var(--accent)">$${adjBasis.toFixed(2)}</span></div>
         <div class="port-basis" style="color:var(--accent4)">${reduction.toFixed(1)}% reduction</div>
+        <div class="port-basis" style="color:${stockRealized>=0?'var(--green)':'var(--red)'}">Stock realized: ${stockRealized>=0?'+':'-'}$${Math.abs(stockRealized).toFixed(2)}</div>
         ${pl !== null ? `<div style="font-size:11px;margin-top:2px;color:${pl>=0?'var(--green)':'var(--red)'}">${pl>=0?'+':''}$${pl.toFixed(0)} P&L</div>` : ''}
       </div>
     </div>`;
@@ -2437,6 +2714,7 @@ function updatePortfolio() {
     const avgCost   = calcAvgCost(pos.lots);
     const totShares = calcTotalShares(pos.lots);
     const collected = tickerPremium[pos.ticker] || 0;
+    const stockRealized = tickerRealizedStockPnl(pos.ticker);
     const adjBasis  = avgCost - collected / Math.max(totShares, 1);
     const pr        = state.prices[pos.ticker];
     const totalCost = pos.lots.reduce((s,l)=>s+(l.shares*l.price),0);
@@ -2501,6 +2779,11 @@ function updatePortfolio() {
           <div class="avg-basis-val" style="color:var(--green)">$${collected.toFixed(2)}</div>
         </div>
         <div class="avg-basis-divider"></div>
+        <div class="avg-basis-item">
+          <div class="avg-basis-label">Realized Stock P&amp;L</div>
+          <div class="avg-basis-val" style="color:${stockRealized>=0?'var(--green)':'var(--red)'}">${stockRealized>=0?'+':'-'}$${Math.abs(stockRealized).toFixed(2)}</div>
+        </div>
+        <div class="avg-basis-divider"></div>
         ${plLine}
         <div class="avg-basis-item">
           <div class="avg-basis-label">Basis Reduction</div>
@@ -2550,6 +2833,8 @@ function setChartMode(mode) {
   document.getElementById('btnCumulative').style.borderColor = mode==='cumulative' ? 'var(--accent)' : '';
   document.getElementById('btnCumulative').style.color = mode==='cumulative' ? 'var(--accent)' : '';
   updateCharts();
+
+  updateStockSalesSection();
 }
 
 // ═══════════════════════════════════════
@@ -3082,10 +3367,11 @@ function downloadTemplate() {
 // ═══════════════════════════════════════
 function exportFullBackup() {
   const backup = {
-    version: 3,
+    version: 4,
     exportedAt: new Date().toISOString(),
     trades: state.trades,
     positions: state.positions,
+    stockSales: state.stockSales || [],
   };
   const json = JSON.stringify(backup, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
@@ -3122,12 +3408,13 @@ function importFullBackup(input) {
         onOk: () => {
           state.trades    = backup.trades    || [];
           state.positions = backup.positions || [];
+          state.stockSales = backup.stockSales || [];
           state.selectedIds   = new Set();
           state.visibleTradeIds = [];
           save();
           render();
           fetchPrices();
-          toast(`✅ Restored ${state.trades.length} trades and ${state.positions.length} positions`);
+          toast(`✅ Restored ${state.trades.length} trades, ${state.positions.length} positions, and ${(state.stockSales||[]).length} share sales`);
         }
       });
     } catch (err) {
